@@ -17,6 +17,7 @@ cd %homepath%\Desktop
 pyinstaller --onefile --windowed --icon=%homepath%\Desktop\test.ico --hidden-import=docx --hidden-import=tkinter --hidden-import=lxml --hidden-import=PIL --distpath="%homepath%\Desktop" "%homepath%\Desktop\新建文件夹\jjtest3.py"
 
 
+
 #### 使用说明
 
 1.  xxxx
