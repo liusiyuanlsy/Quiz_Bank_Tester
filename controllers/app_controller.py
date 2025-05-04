@@ -1,3 +1,15 @@
+"""
+Copyright (c) 2025 Sylvan_930
+基金考试题库系统 is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details.
+"""
+
 import tkinter as tk
 from models.question_bank import QuestionBank
 from services.file_service import FileService
@@ -5,7 +17,15 @@ from services.parser_service import ParserService
 from utils.logger import get_logger
 
 class AppController:
-    """应用程序主控制器"""
+    """
+    应用程序主控制器类
+
+    负责应用程序的核心逻辑，包括：
+    - 题库文件的加载和管理
+    - 题目的显示和导航
+    - 答案检查和记录
+    - 用户设置的处理
+    """
 
     def __init__(self, view=None):
         """
@@ -134,31 +154,40 @@ class AppController:
 
     def jump_to_question(self, question_num):
         """
-        跳转到指定题目
+        跳转到指定题号的题目
+
+        对输入的题号进行验证，确保其在有效范围内，然后跳转到对应题目。
+        如果题号不合法，显示错误信息。
 
         Args:
-            question_num (int): 题目编号
+            question_num (int): 要跳转到的题目编号（从1开始）
 
         Returns:
-            bool: 是否成功跳转
+            bool: 跳转成功返回True，失败返回False
         """
         if self.question_bank:
             try:
+                # 将题号转换为索引（题号从1开始，索引从0开始）
                 index = int(question_num) - 1
+
+                # 验证索引是否在有效范围内
                 if 0 <= index < self.question_bank.get_question_count():
                     # 如果不保存做题记录，则在切换题目时清空用户答案
                     if not self.save_records:
                         self.question_bank.user_answers = {}
 
+                    # 执行跳转并显示题目
                     self.question_bank.jump_to_question(index)
                     self.show_current_question()
                     return True
                 else:
+                    # 题号超出范围，显示错误信息
                     self.view.show_error(
                         "错误",
                         f"请输入1-{self.question_bank.get_question_count()}之间的题号"
                     )
             except ValueError:
+                # 输入无法转换为整数，显示错误
                 self.view.show_error("错误", "请输入有效的题号数字")
         return False
 

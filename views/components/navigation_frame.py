@@ -116,18 +116,17 @@ class NavigationFrame:
             self.stats_label.config(text="")
 
     def _on_jump_click(self):
-        """跳转按钮点击事件"""
+        """跳转按钮点击事件处理函数"""
         try:
             question_num = int(self.jump_entry.get())
-            # 跳转成功时，控制器返回True并自动清空输入框
-            # 跳转失败时，控制器会显示错误信息并返回False，此处不再重复显示错误
-            if self.controller.jump_to_question(question_num):
-                # 跳转成功后清空输入框
-                self.jump_entry.delete(0, tk.END)
-            # 移除else中的错误提示，避免显示两个错误
+            result = self.controller.jump_to_question(question_num)
+            # 无论跳转成功或失败，都清空输入框
+            self.jump_entry.delete(0, tk.END)
+            # 控制器会处理错误提示，此处不再重复显示错误
         except ValueError:
-            # 仅在输入非数字时显示错误
+            # 输入非数字时显示错误并清空输入框
             messagebox.showerror("错误", "请输入有效的题号数字")
+            self.jump_entry.delete(0, tk.END)
 
     def set_random_mode(self, is_random):
         """

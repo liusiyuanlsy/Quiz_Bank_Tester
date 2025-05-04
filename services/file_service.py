@@ -1,3 +1,15 @@
+"""
+Copyright (c) 2025 Sylvan_930
+基金考试题库系统 is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details.
+"""
+
 import os
 import sys
 import time
@@ -7,13 +19,11 @@ from utils.logger import get_logger
 from config.settings import FILE_PATTERNS
 
 class FileService:
-    """文件服务，负责文件操作"""
+    """文件服务类，负责文件选择和基本文件操作"""
 
     def __init__(self):
-        """初始化文件服务"""
+        """初始化文件服务，创建日志器实例"""
         self.logger = get_logger()
-
-    # 删除 find_question_banks 方法，不再需要自动搜索题库文件
 
     def _get_main_directory(self):
         """
@@ -41,13 +51,10 @@ class FileService:
             desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
             if not desktop_dir.endswith(os.path.sep):
                 desktop_dir += os.path.sep
-            self.logger.info(f"额外搜索桌面目录: {desktop_dir}")
             return desktop_dir
         except Exception as e:
             self.logger.error(f"获取桌面路径时出错: {str(e)}")
             return None
-
-    # 删除 _search_directory 方法，不再需要搜索目录
 
     def get_file_info(self, file_path):
         """
@@ -73,15 +80,19 @@ class FileService:
 
     def _open_file_dialog(self, controller=None, direct_load=False):
         """
-        打开文件选择对话框，让用户手动选择题库文件
+        打开系统文件选择对话框，让用户选择题库文件
+
+        创建临时的根窗口显示文件选择对话框，并在选择后进行文件有效性检查。
+        如果设置了direct_load参数，将直接调用控制器的load_question_bank方法加载文件。
 
         Args:
-            controller: 控制器对象，用于控制窗口显示
-            direct_load: 是否直接加载选择的文件
+            controller: 控制器对象，用于调用加载题库方法
+            direct_load: 是否直接加载选择的文件而不仅是返回路径
 
         Returns:
+            str "loaded": 如果direct_load为True且成功加载文件
             str: 选择的文件路径，如果取消则返回None
-            None: 如果direct_load为True且成功加载文件，则返回None
+            None: 如果用户取消选择或发生错误
         """
         try:
             # 创建临时的根窗口
@@ -121,14 +132,14 @@ class FileService:
                     )
                     warn_root.destroy()
 
-                # 如果是直接加载模式，则直接调用控制器的加载方法
+                # 直接加载模式：调用控制器加载题库
                 if direct_load and controller:
                     try:
                         controller.load_question_bank(file_path)
-                        return "loaded"  # 返回特殊值表示已成功加载
+                        return "loaded"  # 返回特殊值表示已成功加载题库
                     except Exception as e:
                         self.logger.error(f"加载题库文件失败: {str(e)}")
-                        # 如果加载失败，返回文件路径，让控制器处理错误
+                        # 加载失败时返回文件路径，允许控制器进行错误处理
                         return file_path
                 else:
                     return file_path
