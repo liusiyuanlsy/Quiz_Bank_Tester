@@ -58,7 +58,7 @@ pip install pyinstaller
 pyinstaller --onefile --windowed --name="基金考试题库系统" main.py
 
 # 推荐的一键打包命令（输出到桌面，方便分发）
-pyinstaller --onefile --windowed --name="基金考试题库系统" --icon=icon.ico --clean --hidden-import=docx --distpath="%userprofile%/Desktop" main.py
+pyinstaller --onefile --windowed --name="基金考试题库系统" --icon=./icon.ico --clean --hidden-import=docx --distpath="%USERPROFILE%\Desktop" main.py
 ```
 
 ### 主要打包参数
