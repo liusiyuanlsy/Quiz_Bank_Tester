@@ -31,122 +31,52 @@ git clone [仓库地址] [项目路径]
 ```
 cd [项目路径]
 uv init .
-uv add python-docx lxml Pillow
+uv add python-docx
 ```
 或使用pip
 ```
-pip install python-docx lxml Pillow
+pip install python-docx
 ```
+
+**依赖说明**：
+- `python-docx`：用于解析Word文档格式的题库文件
+- `lxml`：作为python-docx的依赖项会自动安装，用于XML解析
+- `Pillow`：如果题库中包含图片则需要此库，会作为依赖自动安装
 
 3. 直接运行
 ```
 python main.py
 ```
 
-4. 打包为可执行文件的详细说明
+4. 打包为可执行文件
 
-### 打包准备工作
-首先，确保已安装PyInstaller：
+安装PyInstaller并使用以下命令打包：
 ```
 pip install pyinstaller
-```
-
-### 完整打包流程
-以下是在不同操作系统上打包的详细步骤：
-
-#### Windows系统打包
-```
-# 进入项目目录
-cd [项目路径]
 
 # 基本打包命令
 pyinstaller --onefile --windowed --name="基金考试题库系统" main.py
 
-# 高级打包命令（推荐）
-pyinstaller --onefile --windowed --name="基金考试题库系统" --icon=resources/icon.ico --clean --hidden-import=docx --hidden-import=tkinter --hidden-import=lxml --hidden-import=PIL main.py
+# 推荐的一键打包命令（输出到桌面，方便分发）
+pyinstaller --onefile --windowed --name="基金考试题库系统" --icon=icon.ico --clean --hidden-import=docx --distpath="%userprofile%/Desktop" main.py
 ```
 
-#### macOS系统打包
-```
-# 进入项目目录
-cd [项目路径]
+### 主要打包参数
+- `--onefile`：打包成单个可执行文件（推荐）
+- `--windowed`：以窗口模式运行，不显示控制台
+- `--name`：指定输出文件名称
+- `--distpath`：自定义输出目录，如桌面或其他指定位置
+- `--icon`：指定程序图标（.ico或.icns格式）
 
-# 打包命令
-pyinstaller --onefile --windowed --name="基金考试题库系统" --icon=resources/icon.icns main.py
-```
+### 打包提示
+- 单文件模式（`--onefile`）更适合本程序，使分发和使用更方便
+- 默认输出在项目的dist目录，使用`--distpath`可指定其他位置
+- 通常只需指定`--hidden-import=docx`（Word文档解析库）
+- 其他依赖（如lxml和Pillow）会作为间接依赖自动处理
+- 如运行时提示模块缺失，再添加相应的`--hidden-import`参数
+- 打包后可直接分发可执行文件或与说明文档一起打包为zip文件
 
-#### Linux系统打包
-```
-# 进入项目目录
-cd [项目路径]
-
-# 打包命令
-pyinstaller --onefile --windowed --name="基金考试题库系统" main.py
-```
-
-### 打包方式的选择
-PyInstaller提供了两种主要的打包方式：单文件模式和文件夹模式，对应于是否使用`--onefile`参数：
-
-#### 单文件模式（使用`--onefile`参数）
-打包成单个exe文件的**优点**：
-- 分发简单，只需要一个文件
-- 用户使用方便，双击即可运行
-- 避免文件缺失问题
-- 更整洁的用户体验
-
-**缺点**：
-- 启动速度较慢（需要解压缩到临时目录）
-- 最终文件体积较大
-- 更新需要替换整个文件
-
-#### 文件夹模式（不使用`--onefile`参数）
-打包成文件夹的**优点**：
-- 启动速度快
-- 更容易进行部分更新
-- 总体积略小
-
-**缺点**：
-- 分发不便（需要确保所有文件都包含）
-- 可能出现文件缺失问题
-- 用户体验不如单文件直观
-
-#### 推荐的选择
-**对于基金考试题库系统，推荐使用单文件模式（`--onefile`），因为：**
-1. 本程序相对简单，单文件模式的启动延迟不明显
-2. 用户主要是考生，需要简单方便的使用体验
-3. 避免依赖文件缺失导致的问题
-4. 方便通过邮件、网盘等方式分享
-
-如果您遇到以下情况，可以考虑使用文件夹模式：
-- 程序体积非常大（>100MB）
-- 启动速度要求极高
-- 需要频繁更新程序的一小部分
-
-### 打包参数说明
-- `--onefile`：将所有依赖打包成单个可执行文件（推荐）
-- `--windowed`：以窗口模式运行，不显示控制台窗口
-- `--name`：指定输出的可执行文件名称
-- `--icon`：指定应用程序图标（.ico、.icns等格式）
-- `--clean`：清理临时文件
-- `--hidden-import`：指定额外导入的模块，解决可能的导入错误
-
-### 打包输出位置
-打包完成后，可执行文件在以下位置：
-- Windows: `[项目路径]/dist/基金考试题库系统.exe`
-- macOS: `[项目路径]/dist/基金考试题库系统.app`
-- Linux: `[项目路径]/dist/基金考试题库系统`
-
-### 常见问题与解决方案
-1. **缺少模块错误**：如遇到ImportError，在打包命令中添加`--hidden-import=模块名`
-2. **字体/资源文件缺失**：添加`--add-data="资源目录;目标目录"`参数
-3. **打包文件过大**：使用`--exclude-module=不需要的模块`排除不必要的库
-4. **无法正常启动**：尝试使用`--debug=all`参数获取详细日志进行排查
-
-### 发布与分发
-打包完成后，您可以：
-1. 直接分发exe文件（Windows）或app文件（macOS）
-2. 创建安装程序（可使用NSIS等工具）
-3. 将可执行文件与README、LICENSE等文档一起打包为zip文件分发
+更多详细选项请参考PyInstaller官方文档。
 
 ## 功能特点
 
