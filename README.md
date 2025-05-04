@@ -9,9 +9,12 @@
 
 #### 安装教程
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+uv init D:\Program\Dev_Lsy\Quiz_Bank_Tester
+
+uv add python-docx lxml Pillow pyinstaller
+
+cd %homepath%\Desktop
+pyinstaller --onefile --windowed --icon=C:\Users\Lsy1\Desktop\test.ico --hidden-import=docx --hidden-import=tkinter --hidden-import=lxml --hidden-import=PIL --distpath="%homepath%\Desktop" "%homepath%\Desktop\新建文件夹\jjtest3.py"
 
 #### 使用说明
 
