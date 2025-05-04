@@ -57,6 +57,19 @@ class QuestionBankApp:
             search_dir = os.path.dirname(os.path.abspath(__file__))
         print(f"搜索题库文件，目录: {search_dir}")
 
+        # 额外添加 Windows 桌面路径 - 使用更可靠的方法
+        try:
+            # 方法1：使用os.path.join和os.path.expanduser
+            desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+            # 确保路径末尾有分隔符，但避免重复
+            if not desktop_dir.endswith(os.path.sep):
+                desktop_dir += os.path.sep
+            print(f"额外搜索桌面目录: {desktop_dir}")
+        except Exception as e:
+            print(f"获取桌面路径时出错: {str(e)}")
+            desktop_dir = None
+
+        # 在程序目录中搜索
         for file in os.listdir(search_dir):
             file_lower = file.lower()
             if file_lower.endswith('.docx') and ('题' in file or file_lower == '题.docx'):
@@ -64,6 +77,23 @@ class QuestionBankApp:
                 file_size = os.path.getsize(full_path) / 1024  # KB
                 print(f"找到题库文件: {file} (大小: {file_size:.1f} KB)")
                 bank_files.append(file)
+
+        # 在桌面目录中搜索
+        if desktop_dir and os.path.exists(desktop_dir):
+            try:
+                for file in os.listdir(desktop_dir):
+                    file_lower = file.lower()
+                    if file_lower.endswith('.docx') and ('题' in file or file_lower == '题.docx'):
+                        full_path = os.path.join(desktop_dir, file)
+                        if os.path.exists(full_path):
+                            file_size = os.path.getsize(full_path) / 1024  # KB
+                            print(f"在桌面找到题库文件: {file} (大小: {file_size:.1f} KB)")
+                            # 将完整路径添加到bank_files，而不仅仅是文件名
+                            bank_files.append(full_path)
+            except Exception as e:
+                print(f"搜索桌面目录时出错: {str(e)}")
+        else:
+            print(f"桌面目录不存在或无法访问: {desktop_dir}")
 
         print(f"共找到 {len(bank_files)} 个题库文件")
         return bank_files
@@ -110,17 +140,12 @@ class QuestionBankApp:
 
         # 添加文件到列表
         for file in files:
-            file_listbox.insert(tk.END, file)
+            # 获取文件名（不含路径）用于显示
+            file_name = os.path.basename(file)
+            file_listbox.insert(tk.END, file_name)
 
             # 获取完整路径和文件信息
-            # 兼容PyInstaller打包后的路径查找
-            if getattr(sys, 'frozen', False):
-                # 运行于 exe 模式
-                base_dir = os.path.dirname(sys.executable)
-            else:
-                # 运行于脚本模式
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-            full_path = os.path.join(base_dir, file)
+            full_path = file
             if os.path.exists(full_path):
                 file_size = os.path.getsize(full_path) / 1024  # KB
                 mod_time = os.path.getmtime(full_path)
@@ -298,7 +323,22 @@ class QuestionBankApp:
         self.lbl_status.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
 
     def load_questions(self, filename):
-        doc = Document(filename)
+        # 检查文件是否是完整路径
+        if os.path.isabs(filename):
+            # 如果是完整路径，直接使用
+            full_path = filename
+        else:
+            # 如果不是完整路径，构建完整路径
+            if getattr(sys, 'frozen', False):
+                # 运行于 exe 模式
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                # 运行于脚本模式
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            full_path = os.path.join(base_dir, filename)
+
+        print(f"加载题库文件: {full_path}")
+        doc = Document(full_path)
         current_q = {}
         option_pattern = re.compile(r'^([A-D])[\.、:：]?\s*(.*)$')
         answer_pattern = re.compile(r'[（(]\s*([A-Da-d])\s*[）)]')
