@@ -2,9 +2,9 @@ import os
 import sys
 import time
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from utils.logger import get_logger
-from config.settings import FILE_PATTERNS, FILE_KEYWORDS
+from config.settings import FILE_PATTERNS
 
 class FileService:
     """文件服务，负责文件操作"""
@@ -13,44 +13,7 @@ class FileService:
         """初始化文件服务"""
         self.logger = get_logger()
 
-    def find_question_banks(self, controller=None):
-        """
-        在程序所在目录和桌面搜索题库文件，如果都没找到则打开文件选择器
-
-        Args:
-            controller: 控制器对象，用于控制窗口显示
-
-        Returns:
-            list: 题库文件路径列表
-        """
-        bank_files = []
-
-        # 获取主程序目录
-        main_dir = self._get_main_directory()
-        self.logger.info(f"搜索题库文件，主程序目录: {main_dir}")
-
-        # 获取桌面目录
-        desktop_dir = self._get_desktop_directory()
-
-        # 在主程序目录中搜索
-        if main_dir and os.path.exists(main_dir):
-            bank_files.extend(self._search_directory(main_dir, False, "主程序"))
-
-        # 在桌面目录中搜索
-        if desktop_dir and os.path.exists(desktop_dir):
-            bank_files.extend(self._search_directory(desktop_dir, True))
-        else:
-            self.logger.warning(f"桌面目录不存在或无法访问: {desktop_dir}")
-
-        # 如果没有找到题库文件，打开文件选择器
-        if not bank_files:
-            self.logger.info("未在主程序目录和桌面找到题库文件，打开文件选择器")
-            manual_file = self._open_file_dialog(controller)
-            if manual_file:
-                bank_files.append(manual_file)
-
-        self.logger.info(f"共找到 {len(bank_files)} 个题库文件")
-        return bank_files
+    # 删除 find_question_banks 方法，不再需要自动搜索题库文件
 
     def _get_main_directory(self):
         """
@@ -84,46 +47,7 @@ class FileService:
             self.logger.error(f"获取桌面路径时出错: {str(e)}")
             return None
 
-    def _search_directory(self, directory, is_desktop=False, dir_type="程序"):
-        """
-        在指定目录中搜索题库文件
-
-        Args:
-            directory (str): 目录路径
-            is_desktop (bool): 是否是桌面目录
-            dir_type (str): 目录类型描述，用于日志
-
-        Returns:
-            list: 找到的文件路径列表
-        """
-        result = []
-        try:
-            for file in os.listdir(directory):
-                file_lower = file.lower()
-                # 检查文件是否符合条件
-                is_match = False
-                for pattern in FILE_PATTERNS:
-                    if file_lower.endswith(pattern):
-                        for keyword in FILE_KEYWORDS:
-                            if keyword in file or file_lower == f"{keyword}{pattern}":
-                                is_match = True
-                                break
-                        if is_match:
-                            break
-
-                if is_match:
-                    full_path = os.path.join(directory, file)
-                    if os.path.exists(full_path):
-                        file_size = os.path.getsize(full_path) / 1024  # KB
-                        log_prefix = "在桌面" if is_desktop else ""
-                        self.logger.info(f"{log_prefix}找到题库文件: {file} (大小: {file_size:.1f} KB)")
-
-                        # 始终添加完整路径
-                        result.append(full_path)
-        except Exception as e:
-            self.logger.error(f"搜索{dir_type}目录时出错: {str(e)}")
-
-        return result
+    # 删除 _search_directory 方法，不再需要搜索目录
 
     def get_file_info(self, file_path):
         """
@@ -147,15 +71,17 @@ class FileService:
             }
         return None
 
-    def _open_file_dialog(self, controller=None):
+    def _open_file_dialog(self, controller=None, direct_load=False):
         """
         打开文件选择对话框，让用户手动选择题库文件
 
         Args:
             controller: 控制器对象，用于控制窗口显示
+            direct_load: 是否直接加载选择的文件
 
         Returns:
             str: 选择的文件路径，如果取消则返回None
+            None: 如果direct_load为True且成功加载文件，则返回None
         """
         try:
             # 创建临时的根窗口
@@ -165,17 +91,49 @@ class FileService:
             # 打开文件选择对话框
             file_path = filedialog.askopenfilename(
                 title="选择题库文件",
-                filetypes=[("Word文档", "*.docx"), ("所有文件", "*.*")]
+                filetypes=[
+                    ("所有文件", "*.*")  # 只保留所有文件选项
+                ],
+                initialdir=self._get_main_directory()  # 设置初始目录为主程序目录
             )
 
             # 销毁临时窗口
             root.destroy()
 
             if file_path:
-                self.logger.info(f"用户手动选择了题库文件: {file_path}")
-                return file_path
+                self.logger.info(f"用户选择了文件: {file_path}")
+
+                # 确保文件存在
+                if not os.path.exists(file_path):
+                    self.logger.error(f"选择的文件不存在: {file_path}")
+                    return None
+
+                # 检查文件扩展名是否支持
+                file_ext = os.path.splitext(file_path)[1].lower()
+                if file_ext not in FILE_PATTERNS and file_ext != '':  # 空扩展名视为文件夹，跳过检查
+                    self.logger.warning(f"选择的文件类型不受支持: {file_ext}")
+                    # 创建临时的根窗口用于显示警告
+                    warn_root = tk.Tk()
+                    warn_root.withdraw()
+                    messagebox.showwarning(
+                        "文件类型警告",
+                        f"选择的文件类型 {file_ext} 不在支持列表中，但系统仍将尝试加载。\n\n如果加载失败，请选择 .docx, .txt 或 .csv 格式的文件。"
+                    )
+                    warn_root.destroy()
+
+                # 如果是直接加载模式，则直接调用控制器的加载方法
+                if direct_load and controller:
+                    try:
+                        controller.load_question_bank(file_path)
+                        return "loaded"  # 返回特殊值表示已成功加载
+                    except Exception as e:
+                        self.logger.error(f"加载题库文件失败: {str(e)}")
+                        # 如果加载失败，返回文件路径，让控制器处理错误
+                        return file_path
+                else:
+                    return file_path
             else:
-                self.logger.info("用户取消了手动选择题库文件")
+                self.logger.info("用户取消了文件选择")
                 return None
         except Exception as e:
             self.logger.error(f"打开文件选择对话框时出错: {str(e)}")

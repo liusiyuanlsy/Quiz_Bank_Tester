@@ -1,5 +1,6 @@
 import re
 import os
+import csv
 from docx import Document
 from models.question import Question
 from utils.logger import get_logger
@@ -29,7 +30,7 @@ class ParserService:
 
     def parse_document(self, file_path):
         """
-        解析Word文档，提取题目
+        解析文档，提取题目，支持多种文件格式
 
         Args:
             file_path (str): 文档路径
@@ -48,12 +49,38 @@ class ParserService:
             self.logger.error(f"文件不存在: {file_path}")
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
-        # 打开文档
+        # 根据文件扩展名选择解析方法
+        file_ext = os.path.splitext(file_path)[1].lower()
+
+        if file_ext == '.docx':
+            return self._parse_docx(file_path)
+        elif file_ext == '.txt':
+            return self._parse_txt(file_path)
+        elif file_ext == '.csv':
+            return self._parse_csv(file_path)
+        else:
+            # 尝试作为文本文件解析
+            try:
+                return self._parse_txt(file_path)
+            except Exception as e:
+                self.logger.error(f"无法解析文件: {str(e)}")
+                raise ValueError(f"不支持的文件格式: {file_ext}")
+
+    def _parse_docx(self, file_path):
+        """
+        解析Word文档
+
+        Args:
+            file_path (str): 文档路径
+
+        Returns:
+            list: 题目对象列表
+        """
         try:
             doc = Document(file_path)
         except Exception as e:
-            self.logger.error(f"打开文档失败: {str(e)}")
-            raise ValueError(f"打开文档失败: {str(e)}")
+            self.logger.error(f"打开Word文档失败: {str(e)}")
+            raise ValueError(f"打开Word文档失败: {str(e)}")
 
         questions = []
         current_q = None
@@ -178,6 +205,260 @@ class ParserService:
 
         # 最终处理：确保所有题目都有答案
         self._finalize_questions(questions)
+        self.logger.info(f"解析完成，共解析 {len(questions)} 道题目")
+        return questions
+
+    def _parse_txt(self, file_path):
+        """
+        解析文本文件
+
+        Args:
+            file_path (str): 文件路径
+
+        Returns:
+            list: 题目对象列表
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except UnicodeDecodeError:
+            # 尝试其他编码
+            try:
+                with open(file_path, 'r', encoding='gbk') as f:
+                    lines = f.readlines()
+            except Exception as e:
+                self.logger.error(f"打开文本文件失败: {str(e)}")
+                raise ValueError(f"打开文本文件失败: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"打开文本文件失败: {str(e)}")
+            raise ValueError(f"打开文本文件失败: {str(e)}")
+
+        questions = []
+        current_q = None
+        pending_questions = []
+        has_empty_brackets = False
+
+        # 解析文本行
+        for i, line in enumerate(lines):
+            text = line.strip()
+            if not text:
+                continue
+
+            # 题目识别逻辑
+            if is_question_line(text, None):
+                self.logger.debug(f"[行 {i}] 识别为题目: {text[:50]}...")
+
+                if current_q and current_q.text:
+                    questions.append(current_q)
+                    self.logger.debug(f"添加上一题: {current_q.text[:30]}..., 答案: {current_q.answer}")
+
+                current_q = Question(text=text)
+
+                # 检查题目行中是否包含答案或空括号
+                match = self.answer_pattern.search(text)
+                brackets_match = self.empty_brackets_pattern.search(text)
+
+                if match:
+                    current_q.answer = match.group(1).upper()
+                    self.logger.debug(f"在题目中找到答案: {match.group(1).upper()}")
+                    has_empty_brackets = False
+                elif brackets_match:
+                    self.logger.debug(f"题目包含空括号，等待后续内容中找答案")
+                    has_empty_brackets = True
+                else:
+                    self.logger.debug(f"在题目中未找到答案或空括号")
+                    has_empty_brackets = False
+
+            elif self.option_pattern.match(text):
+                match = self.option_pattern.match(text)
+                option_text = f"{match.group(1)}. {match.group(2).strip()}"
+                if current_q:
+                    current_q.options.append(option_text)
+                    self.logger.debug(f"[行 {i}] 识别为选项: {option_text}")
+
+            # 处理答案和解析
+            elif current_q:
+                # 检查是否是答案行
+                is_answer_line = self._process_answer_line(text, current_q, has_empty_brackets, i)
+
+                if is_answer_line:
+                    continue
+
+                # 检查是否是解析行
+                if re.match(r'^解析[:：]', text):
+                    current_q.explanation = re.sub(r'^解析[:：]\s*', '', text).strip()
+                    self.logger.debug(f"[行 {i}] 识别为解析: {text[:50]}...")
+                    continue
+
+                # 处理题目延续或新题目
+                if not current_q.options and not current_q.explanation:
+                    # 检查是否可能是下一题的题目被误认为是上一题的内容
+                    if self.question_num_pattern.search(text):
+                        self.logger.debug(f"[行 {i}] 可能是新题目，但格式未被识别: {text[:50]}...")
+
+                        # 保存当前题目，如果它没有答案，加入待处理列表
+                        if not current_q.answer:
+                            self.logger.debug(f"上一题没有答案，加入待处理队列: {current_q.text[:30]}...")
+                            pending_questions.append(current_q)
+                        else:
+                            questions.append(current_q)
+
+                        # 创建新题目
+                        current_q = Question(text=text)
+
+                        # 检查题目行中是否包含答案或空括号
+                        match = self.answer_pattern.search(text)
+                        brackets_match = self.empty_brackets_pattern.search(text)
+
+                        if match:
+                            current_q.answer = match.group(1).upper()
+                            has_empty_brackets = False
+                        elif brackets_match:
+                            has_empty_brackets = True
+                        else:
+                            has_empty_brackets = False
+                    else:
+                        # 作为题目延续添加
+                        current_q.text += '\n' + text
+                        self.logger.debug(f"[行 {i}] 添加到题目文本: {text[:50]}...")
+
+        # 处理最后一个题目
+        if current_q:
+            if current_q.answer:
+                questions.append(current_q)
+                self.logger.debug(f"添加最后一题: {current_q.text[:30]}..., 答案: {current_q.answer}")
+            elif pending_questions:
+                # 如果最后一题没有答案，查看是否有待处理题目也没答案
+                self.logger.debug(f"最后一题没有答案，检查是否可以从待处理题目中找到匹配")
+                pending_questions.append(current_q)
+
+                # 尝试处理没有答案的题目
+                for q in pending_questions:
+                    # 如果该题包含明显的题号，尝试解析
+                    match = re.search(r'^\d+[\.、]|^第(\d+)题', q.text)
+                    if match:
+                        self.logger.debug(f"处理待定题目: {q.text[:50]}...")
+
+                        # 如果题目有空括号但没答案，尝试从相邻题目中查找答案
+                        if self.empty_brackets_pattern.search(q.text) and not q.answer:
+                            self._try_find_answer_from_neighbors(q, pending_questions)
+
+                    # 无论如何，添加到问题列表
+                    questions.append(q)
+            else:
+                questions.append(current_q)
+
+        # 清理 pending_questions，确保所有题目都被添加
+        for q in pending_questions:
+            if q not in questions:
+                questions.append(q)
+                self.logger.debug(f"添加待处理题目: {q.text[:30]}...")
+
+        # 最终处理：确保所有题目都有答案
+        self._finalize_questions(questions)
+        self.logger.info(f"解析完成，共解析 {len(questions)} 道题目")
+        return questions
+
+    def _parse_csv(self, file_path):
+        """
+        解析CSV文件
+
+        Args:
+            file_path (str): 文件路径
+
+        Returns:
+            list: 题目对象列表
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+        except UnicodeDecodeError:
+            # 尝试其他编码
+            try:
+                with open(file_path, 'r', encoding='gbk') as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+            except Exception as e:
+                self.logger.error(f"打开CSV文件失败: {str(e)}")
+                raise ValueError(f"打开CSV文件失败: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"打开CSV文件失败: {str(e)}")
+            raise ValueError(f"打开CSV文件失败: {str(e)}")
+
+        questions = []
+
+        # 检查CSV文件格式
+        if len(rows) < 2:  # 至少需要标题行和一行数据
+            self.logger.error("CSV文件格式错误: 行数不足")
+            raise ValueError("CSV文件格式错误: 行数不足")
+
+        # 尝试识别列
+        headers = rows[0]
+        question_col = -1
+        options_cols = []
+        answer_col = -1
+        explanation_col = -1
+
+        for i, header in enumerate(headers):
+            header_lower = header.lower()
+            if '题目' in header_lower or '问题' in header_lower or 'question' in header_lower:
+                question_col = i
+            elif '选项' in header_lower or 'option' in header_lower:
+                options_cols.append(i)
+            elif 'a' == header_lower or 'a选项' in header_lower:
+                options_cols.append(i)
+            elif 'b' == header_lower or 'b选项' in header_lower:
+                options_cols.append(i)
+            elif 'c' == header_lower or 'c选项' in header_lower:
+                options_cols.append(i)
+            elif 'd' == header_lower or 'd选项' in header_lower:
+                options_cols.append(i)
+            elif '答案' in header_lower or 'answer' in header_lower:
+                answer_col = i
+            elif '解析' in header_lower or 'explanation' in header_lower:
+                explanation_col = i
+
+        # 如果没有识别出题目列，尝试使用第一列作为题目列
+        if question_col == -1:
+            question_col = 0
+
+        # 解析每一行数据
+        for i, row in enumerate(rows[1:], 1):  # 跳过标题行
+            if len(row) <= question_col:
+                continue  # 跳过格式不正确的行
+
+            question_text = row[question_col].strip()
+            if not question_text:
+                continue  # 跳过空题目
+
+            # 创建题目对象
+            question = Question(text=question_text)
+
+            # 添加选项
+            for col in options_cols:
+                if col < len(row) and row[col].strip():
+                    option_letter = chr(65 + options_cols.index(col))  # A, B, C, D...
+                    option_text = f"{option_letter}. {row[col].strip()}"
+                    question.options.append(option_text)
+
+            # 添加答案
+            if answer_col != -1 and answer_col < len(row) and row[answer_col].strip():
+                answer = row[answer_col].strip().upper()
+                # 如果答案是多个字符，尝试提取第一个字母
+                if len(answer) > 1:
+                    match = re.search(r'[A-D]', answer)
+                    if match:
+                        answer = match.group(0)
+                if answer in "ABCD":
+                    question.answer = answer
+
+            # 添加解析
+            if explanation_col != -1 and explanation_col < len(row) and row[explanation_col].strip():
+                question.explanation = row[explanation_col].strip()
+
+            questions.append(question)
+
         self.logger.info(f"解析完成，共解析 {len(questions)} 道题目")
         return questions
 

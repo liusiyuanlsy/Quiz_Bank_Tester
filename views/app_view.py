@@ -3,7 +3,6 @@ from tkinter import ttk, messagebox
 from views.components.question_frame import QuestionFrame
 from views.components.feedback_frame import FeedbackFrame
 from views.components.navigation_frame import NavigationFrame
-from views.file_selection_view import FileSelectionView
 from config.settings import APP_TITLE, WINDOW_SIZE, COLOR_STATUS_TEXT
 
 class AppView:
@@ -74,19 +73,7 @@ class AppView:
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
 
-    def show_file_selection_dialog(self, files):
-        """
-        显示文件选择对话框
-
-        Args:
-            files: 文件列表
-
-        Returns:
-            str: 选择的文件路径，如果取消则返回空字符串
-        """
-        # 注意：此方法已不再使用，保留是为了兼容性
-        # 文件选择现在由 AppController 直接处理
-        return ""
+    # 删除 show_file_selection_dialog 方法，不再需要
 
     def update_file_path(self, file_path):
         """

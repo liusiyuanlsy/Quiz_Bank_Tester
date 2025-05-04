@@ -3,7 +3,6 @@ from models.question_bank import QuestionBank
 from services.file_service import FileService
 from services.parser_service import ParserService
 from utils.logger import get_logger
-from views.file_selection_view import FileSelectionView
 
 class AppController:
     """应用程序主控制器"""
@@ -42,19 +41,21 @@ class AppController:
         # 隐藏主窗口（做题窗口）
         self.view.root.withdraw()
 
-        # 搜索题库文件
-        bank_files = self.file_service.find_question_banks(self)
-        if not bank_files:
-            self.view.show_error("错误", "未找到题库文件！请确保同文件夹下有名称包含'题库'或'题'的Word文档")
+        # 直接使用系统文件选择器
+        file_path = self.file_service._open_file_dialog(self, direct_load=True)
+
+        # 如果用户取消选择，退出应用
+        if file_path is None:
             self.view.destroy()
             return False
 
-        # 创建并显示文件选择窗口
-        self.logger.info(f"找到 {len(bank_files)} 个题库文件，显示选择对话框")
-        root = tk.Tk()
-        file_selection = FileSelectionView(root, bank_files, self)
-        file_selection.show()
+        # 如果已成功加载题库文件（返回"loaded"），则正常启动应用程序
+        if file_path == "loaded":
+            return True
 
+        # 其他情况（例如选择了文件但加载失败）
+        # 重新尝试选择文件
+        self.reselect_question_bank()
         return True
 
     def load_question_bank(self, bank_file):
@@ -83,8 +84,10 @@ class AppController:
             self.show_current_question()
         except Exception as e:
             self.logger.error(f"加载题库失败: {str(e)}")
-            self.view.show_error("错误", f"加载题库失败: {str(e)}")
-            self.exit_application()
+            self.view.show_error("错误", f"加载题库失败: {str(e)}\n\n请确保选择的是正确格式的题库文件。")
+
+            # 重新选择题库文件，而不是退出应用程序
+            self.reselect_question_bank()
 
     def show_current_question(self):
         """显示当前题目"""
@@ -235,18 +238,14 @@ class AppController:
         # 隐藏做题窗口
         self.view.root.withdraw()
 
-        # 搜索题库文件
-        bank_files = self.file_service.find_question_banks(self)
-        if not bank_files:
-            self.view.show_error("错误", "未找到题库文件！请确保同文件夹下有名称包含'题库'或'题'的Word文档")
-            self.view.root.deiconify()  # 如果没有找到题库文件，重新显示做题窗口
-            return
+        # 直接使用系统文件选择器
+        file_path = self.file_service._open_file_dialog(self, direct_load=True)
 
-        # 创建并显示文件选择窗口
-        self.logger.info(f"找到 {len(bank_files)} 个题库文件，显示选择对话框")
-        root = tk.Tk()
-        file_selection = FileSelectionView(root, bank_files, self)
-        file_selection.show()
+        # 如果用户取消选择，显示原窗口
+        if file_path is None:
+            self.view.root.deiconify()
+        # 如果已成功加载题库文件（返回"loaded"），窗口显示已由load_question_bank处理
+        # 其他情况（例如选择了文件但加载失败）不需要特殊处理
 
     def exit_application(self):
         """退出应用程序"""

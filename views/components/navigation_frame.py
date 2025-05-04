@@ -119,7 +119,10 @@ class NavigationFrame:
         """跳转按钮点击事件"""
         try:
             question_num = int(self.jump_entry.get())
-            if not self.controller.jump_to_question(question_num):
+            if self.controller.jump_to_question(question_num):
+                # 跳转成功后清空输入框
+                self.jump_entry.delete(0, tk.END)
+            else:
                 messagebox.showerror("错误", "请输入有效的题号")
         except ValueError:
             messagebox.showerror("错误", "请输入有效的题号数字")

@@ -19,8 +19,7 @@ COLOR_BACKGROUND = "#f5f5f5"
 COLOR_STATUS_TEXT = "#666666"
 
 # 文件配置
-FILE_PATTERNS = ['.docx']
-FILE_KEYWORDS = ['题库', '题']
+FILE_PATTERNS = ['.docx', '.txt', '.csv']
 
 # 日志配置
 LOG_LEVEL = "INFO"
